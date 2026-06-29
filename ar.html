@@ -36,29 +36,92 @@
     }
 
     #status {
-      font-weight: 800;
+      font-weight: 850;
       margin-bottom: 4px;
     }
 
-    #saveBtn {
+    #captureBtn {
       position: fixed;
       left: 50%;
       bottom: 34px;
       transform: translateX(-50%);
       z-index: 9999;
-      padding: 15px 24px;
-      border: 0;
-      border-radius: 999px;
-      background: #111;
-      color: #fff;
-      font-size: 16px;
-      font-weight: 800;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 5px solid #111;
+      background: #ffffff;
       box-shadow: 0 8px 30px rgba(0,0,0,0.25);
       display: none;
     }
 
-    #saveBtn:active {
-      transform: translateX(-50%) scale(0.96);
+    #captureBtn::after {
+      content: "";
+      position: absolute;
+      inset: 9px;
+      border-radius: 50%;
+      background: #111;
+    }
+
+    #captureBtn:active {
+      transform: translateX(-50%) scale(0.94);
+    }
+
+    #savePanel {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 24px;
+      z-index: 10000;
+      padding: 16px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.94);
+      color: #111;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+      backdrop-filter: blur(14px);
+      display: none;
+      text-align: center;
+    }
+
+    #savePanelTitle {
+      font-size: 15px;
+      font-weight: 850;
+      margin-bottom: 10px;
+    }
+
+    #savePanelText {
+      font-size: 13px;
+      line-height: 1.55;
+      color: #555;
+      margin-bottom: 14px;
+    }
+
+    .panelBtn {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px 16px;
+      border-radius: 999px;
+      border: 0;
+      font-size: 15px;
+      font-weight: 850;
+      text-decoration: none;
+      margin-top: 8px;
+    }
+
+    #downloadBtn {
+      background: #111;
+      color: #fff;
+    }
+
+    #openBtn {
+      background: #eeeeee;
+      color: #111;
+    }
+
+    #closeBtn {
+      background: transparent;
+      color: #777;
     }
 
     video {
@@ -94,7 +157,18 @@
     <div id="sub">사진이 인식되면 이미지가 서서히 나타납니다.</div>
   </div>
 
-  <button id="saveBtn">기억 저장하기</button>
+  <button id="captureBtn" aria-label="기억 저장하기"></button>
+
+  <div id="savePanel">
+    <div id="savePanelTitle">기억 저장하기</div>
+    <div id="savePanelText">
+      AI로 재구성된 이미지를 저장합니다.<br>
+      iPhone에서는 이미지 열기 후 공유 버튼으로 사진 앱에 저장할 수 있습니다.
+    </div>
+    <a id="downloadBtn" class="panelBtn" href="./assets/ai.jpg" download="memory-reconstruction.jpg">다운로드하기</a>
+    <a id="openBtn" class="panelBtn" href="./assets/ai.jpg" target="_blank">이미지 열기</a>
+    <button id="closeBtn" class="panelBtn">닫기</button>
+  </div>
 
   <a-scene
     mindar-image="imageTargetSrc: ./assets/target.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
@@ -127,7 +201,9 @@
     const subEl = document.getElementById("sub");
     const target = document.getElementById("target");
     const overlay = document.getElementById("aiOverlay");
-    const saveBtn = document.getElementById("saveBtn");
+    const captureBtn = document.getElementById("captureBtn");
+    const savePanel = document.getElementById("savePanel");
+    const closeBtn = document.getElementById("closeBtn");
 
     const FADE_DURATION = 4000;
     let animationFrame = null;
@@ -145,10 +221,21 @@
       setOpacity(0);
     }
 
+    function showCaptureButton() {
+      isImageReady = true;
+      captureBtn.style.display = "block";
+      subEl.textContent = "셔터 버튼을 눌러 기억을 저장할 수 있습니다.";
+    }
+
+    function hideCaptureButton() {
+      isImageReady = false;
+      captureBtn.style.display = "none";
+      savePanel.style.display = "none";
+    }
+
     function startFade() {
       stopFade();
-      isImageReady = false;
-      saveBtn.style.display = "none";
+      hideCaptureButton();
       startTime = performance.now();
 
       function animate(now) {
@@ -162,9 +249,7 @@
         if (progress < 1) {
           animationFrame = requestAnimationFrame(animate);
         } else {
-          isImageReady = true;
-          saveBtn.style.display = "block";
-          subEl.textContent = "기억 저장하기 버튼을 눌러 이미지를 저장할 수 있습니다.";
+          showCaptureButton();
         }
       }
 
@@ -180,22 +265,21 @@
     target.addEventListener("targetLost", () => {
       statusEl.textContent = "전시 사진을 다시 비춰주세요.";
       subEl.textContent = "인식이 끊어졌습니다.";
-      isImageReady = false;
-      saveBtn.style.display = "none";
+      hideCaptureButton();
       stopFade();
     });
 
-    saveBtn.addEventListener("click", () => {
+    captureBtn.addEventListener("click", () => {
       if (!isImageReady) return;
+      savePanel.style.display = "block";
+      captureBtn.style.display = "none";
+      statusEl.textContent = "기억 저장하기";
+      subEl.textContent = "재구성된 이미지를 저장하거나 열 수 있습니다.";
+    });
 
-      const link = document.createElement("a");
-      link.href = "./assets/ai.jpg";
-      link.download = "memory-reconstruction.jpg";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      subEl.textContent = "이미지를 저장했습니다. iPhone에서는 다운로드 항목을 확인해주세요.";
+    closeBtn.addEventListener("click", () => {
+      savePanel.style.display = "none";
+      if (isImageReady) captureBtn.style.display = "block";
     });
   </script>
 </body>

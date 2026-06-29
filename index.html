@@ -3,9 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>UM Research Lab - WebAR Prototype A</title>
+  <title>WebAR Prototype A</title>
 
-  <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -16,20 +15,19 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif;
     }
 
     #ui {
       position: fixed;
-      z-index: 10;
-      top: 14px;
-      left: 14px;
-      right: 14px;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 9999;
       padding: 12px 14px;
       border-radius: 14px;
-      color: white;
-      background: rgba(0,0,0,0.45);
-      backdrop-filter: blur(8px);
+      color: #fff;
+      background: rgba(0, 0, 0, 0.55);
       font-size: 14px;
       line-height: 1.45;
       pointer-events: none;
@@ -40,9 +38,21 @@
       margin-bottom: 4px;
     }
 
-    .hidden {
-      opacity: 0;
-      transition: opacity 0.4s ease;
+    video {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: -2 !important;
+    }
+
+    canvas {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      z-index: 1 !important;
     }
   </style>
 </head>
@@ -53,37 +63,26 @@
     <div id="sub">사진이 인식되면 AI 이미지가 천천히 나타납니다.</div>
   </div>
 
-  <!--
-    중요:
-    1) assets/target.mind 파일이 반드시 있어야 합니다.
-    2) assets/ai.jpg 파일이 반드시 있어야 합니다.
-    3) targetIndex="0"은 첫 번째 타깃 이미지를 뜻합니다.
-  -->
   <a-scene
     mindar-image="imageTargetSrc: ./assets/target.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
     embedded
     color-space="sRGB"
-    renderer="colorManagement: true, physicallyCorrectLights"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true"
     vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: true">
+    device-orientation-permission-ui="enabled: false">
 
     <a-assets>
-      <img id="aiImage" src="./assets/ai.jpg" crossorigin="anonymous" />
+      <img id="aiImage" src="./assets/ai.jpg" crossorigin="anonymous">
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <a-entity id="target" mindar-image-target="targetIndex: 0">
-      <!--
-        width/height는 실제 원본 사진 비율에 맞게 조정하세요.
-        예: 세로 사진이면 width="1" height="1.5"
-            가로 사진이면 width="1.5" height="1"
-      -->
       <a-image
         id="aiOverlay"
         src="#aiImage"
         position="0 0 0.01"
-        width="1"
+        width="1.6"
         height="1"
         material="transparent: true; opacity: 0;">
       </a-image>
@@ -93,38 +92,32 @@
   <script>
     const statusEl = document.getElementById("status");
     const subEl = document.getElementById("sub");
-    const uiEl = document.getElementById("ui");
-
     const target = document.getElementById("target");
     const overlay = document.getElementById("aiOverlay");
 
-    let fadeRequest = null;
-    let fadeStart = null;
-
-    // 페이드 시간: 여기 숫자만 바꾸면 됨. 4000 = 4초
-    const FADE_DURATION_MS = 4000;
+    const FADE_DURATION = 4000;
+    let animationFrame = null;
+    let startTime = null;
 
     function setOpacity(value) {
-      overlay.setAttribute("material", "opacity", String(value));
+      overlay.setAttribute("material", "opacity", value);
     }
 
     function stopFade() {
-      if (fadeRequest) cancelAnimationFrame(fadeRequest);
-      fadeRequest = null;
-      fadeStart = null;
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      startTime = null;
+      setOpacity(0);
     }
 
     function startFade() {
       stopFade();
-      setOpacity(0);
+      startTime = performance.now();
 
-      fadeStart = performance.now();
-
-      function step(now) {
-        const elapsed = now - fadeStart;
-        const progress = Math.min(elapsed / FADE_DURATION_MS, 1);
-
-        // ease-in-out 느낌
+      function animate(now) {
+        const progress = Math.min((now - startTime) / FADE_DURATION, 1);
         const eased = progress < 0.5
           ? 2 * progress * progress
           : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -132,19 +125,16 @@
         setOpacity(eased);
 
         if (progress < 1) {
-          fadeRequest = requestAnimationFrame(step);
-        } else {
-          fadeRequest = null;
+          animationFrame = requestAnimationFrame(animate);
         }
       }
 
-      fadeRequest = requestAnimationFrame(step);
+      animationFrame = requestAnimationFrame(animate);
     }
 
     target.addEventListener("targetFound", () => {
       statusEl.textContent = "사진이 인식되었습니다.";
-      subEl.textContent = "기억이 서서히 재구성됩니다.";
-      uiEl.classList.remove("hidden");
+      subEl.textContent = "AI 이미지가 서서히 나타납니다.";
       startFade();
     });
 
@@ -152,7 +142,6 @@
       statusEl.textContent = "사진을 다시 비춰주세요.";
       subEl.textContent = "인식이 끊어졌습니다.";
       stopFade();
-      setOpacity(0);
     });
   </script>
 </body>

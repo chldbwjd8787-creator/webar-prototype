@@ -3,91 +3,198 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Memory Reconstruction</title>
+  <title>WebAR Prototype A</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
     html, body {
       margin: 0;
       width: 100%;
       height: 100%;
-      background: #050505;
-      color: white;
+      overflow: hidden;
+      background: transparent;
       font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif;
     }
 
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 28px;
-      box-sizing: border-box;
+    #ui {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 9999;
+      padding: 12px 14px;
+      border-radius: 14px;
+      color: white;
+      background: rgba(0,0,0,0.55);
+      font-size: 14px;
+      line-height: 1.45;
+      pointer-events: none;
     }
 
-    .wrap {
-      width: 100%;
-      max-width: 420px;
-    }
-
-    .label {
-      font-size: 13px;
-      opacity: 0.55;
-      margin-bottom: 18px;
-      letter-spacing: 0.08em;
-    }
-
-    h1 {
-      font-size: 30px;
-      line-height: 1.2;
-      margin: 0 0 22px;
+    #status {
       font-weight: 700;
+      margin-bottom: 4px;
     }
 
-    p {
-      font-size: 15px;
-      line-height: 1.65;
-      opacity: 0.78;
-      margin: 0 0 30px;
-    }
-
-    .notice {
-      font-size: 13px;
-      line-height: 1.6;
-      opacity: 0.55;
-      margin-bottom: 28px;
-    }
-
-    a {
-      display: block;
-      text-align: center;
-      padding: 16px 18px;
+    #saveBtn {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%);
+      z-index: 9999;
+      padding: 15px 24px;
+      border: 0;
       border-radius: 999px;
       background: white;
       color: black;
-      text-decoration: none;
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 800;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      display: none;
+    }
+
+    #saveBtn:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+
+    video {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: 0 !important;
+    }
+
+    canvas {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 1 !important;
+    }
+
+    a-scene {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 1 !important;
     }
   </style>
 </head>
 
 <body>
-  <main class="wrap">
-    <div class="label">WEB AR PROTOTYPE</div>
+  <div id="ui">
+    <div id="status">카메라를 허용한 뒤, 전시 사진을 비춰주세요.</div>
+    <div id="sub">사진이 인식되면 AI 이미지가 천천히 나타납니다.</div>
+  </div>
 
-    <h1>남겨진 사람들의<br>기억과 흔적</h1>
+  <button id="saveBtn">기억 저장하기</button>
 
-    <p>
-      화면이 열리면 카메라를 허용한 뒤,<br>
-      전시장에 걸린 사진을 비춰주세요.<br>
-      사진이 인식되면 다른 이미지가 서서히 나타납니다.
-    </p>
+  <a-scene
+    mindar-image="imageTargetSrc: ./assets/target.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
+    embedded
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
 
-    <div class="notice">
-      이 경험은 관객의 스마트폰 카메라를 사용합니다.<br>
-      별도의 앱 설치는 필요하지 않습니다.
-    </div>
+    <a-assets>
+      <img id="aiImage" src="./assets/ai.jpg" crossorigin="anonymous">
+    </a-assets>
 
-    <a href="./ar.html">시작하기</a>
-  </main>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity id="target" mindar-image-target="targetIndex: 0">
+      <a-image
+        id="aiOverlay"
+        src="#aiImage"
+        position="0 0 0.01"
+        width="1.6"
+        height="1"
+        material="transparent: true; opacity: 0;">
+      </a-image>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const subEl = document.getElementById("sub");
+    const target = document.getElementById("target");
+    const overlay = document.getElementById("aiOverlay");
+    const saveBtn = document.getElementById("saveBtn");
+
+    const FADE_DURATION = 4000;
+    let animationFrame = null;
+    let startTime = null;
+    let isImageReady = false;
+
+    function setOpacity(value) {
+      overlay.setAttribute("material", "opacity", value);
+    }
+
+    function stopFade() {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      startTime = null;
+      setOpacity(0);
+    }
+
+    function startFade() {
+      stopFade();
+      isImageReady = false;
+      saveBtn.style.display = "none";
+      startTime = performance.now();
+
+      function animate(now) {
+        const progress = Math.min((now - startTime) / FADE_DURATION, 1);
+        const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+        setOpacity(eased);
+
+        if (progress < 1) {
+          animationFrame = requestAnimationFrame(animate);
+        } else {
+          isImageReady = true;
+          saveBtn.style.display = "block";
+          subEl.textContent = "기억 저장하기 버튼을 눌러 이미지를 저장할 수 있습니다.";
+        }
+      }
+
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    target.addEventListener("targetFound", () => {
+      statusEl.textContent = "사진이 인식되었습니다.";
+      subEl.textContent = "AI 이미지가 서서히 나타납니다.";
+      startFade();
+    });
+
+    target.addEventListener("targetLost", () => {
+      statusEl.textContent = "사진을 다시 비춰주세요.";
+      subEl.textContent = "인식이 끊어졌습니다.";
+      isImageReady = false;
+      saveBtn.style.display = "none";
+      stopFade();
+    });
+
+    saveBtn.addEventListener("click", () => {
+      if (!isImageReady) return;
+
+      const link = document.createElement("a");
+      link.href = "./assets/ai.jpg";
+      link.download = "reconstructed-memory.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      subEl.textContent = "이미지를 저장했습니다. iPhone에서는 다운로드 항목 또는 공유 메뉴를 확인해주세요.";
+    });
+  </script>
 </body>
 </html>

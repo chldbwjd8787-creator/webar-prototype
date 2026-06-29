@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>WebAR Prototype A</title>
+  <title>Memory AR</title>
 
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -14,7 +14,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: transparent;
+      background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", sans-serif;
     }
 
@@ -26,16 +26,39 @@
       z-index: 9999;
       padding: 12px 14px;
       border-radius: 14px;
-      color: white;
-      background: rgba(0,0,0,0.55);
+      color: #111;
+      background: rgba(255,255,255,0.82);
       font-size: 14px;
       line-height: 1.45;
       pointer-events: none;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      backdrop-filter: blur(10px);
     }
 
     #status {
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 4px;
+    }
+
+    #saveBtn {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%);
+      z-index: 9999;
+      padding: 15px 24px;
+      border: 0;
+      border-radius: 999px;
+      background: #111;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      display: none;
+    }
+
+    #saveBtn:active {
+      transform: translateX(-50%) scale(0.96);
     }
 
     video {
@@ -67,9 +90,11 @@
 
 <body>
   <div id="ui">
-    <div id="status">카메라를 허용한 뒤, 전시 사진을 비춰주세요.</div>
-    <div id="sub">사진이 인식되면 AI 이미지가 천천히 나타납니다.</div>
+    <div id="status">전시 사진을 비춰주세요.</div>
+    <div id="sub">사진이 인식되면 이미지가 서서히 나타납니다.</div>
   </div>
+
+  <button id="saveBtn">기억 저장하기</button>
 
   <a-scene
     mindar-image="imageTargetSrc: ./assets/target.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
@@ -102,10 +127,12 @@
     const subEl = document.getElementById("sub");
     const target = document.getElementById("target");
     const overlay = document.getElementById("aiOverlay");
+    const saveBtn = document.getElementById("saveBtn");
 
     const FADE_DURATION = 4000;
     let animationFrame = null;
     let startTime = null;
+    let isImageReady = false;
 
     function setOpacity(value) {
       overlay.setAttribute("material", "opacity", value);
@@ -120,6 +147,8 @@
 
     function startFade() {
       stopFade();
+      isImageReady = false;
+      saveBtn.style.display = "none";
       startTime = performance.now();
 
       function animate(now) {
@@ -132,6 +161,10 @@
 
         if (progress < 1) {
           animationFrame = requestAnimationFrame(animate);
+        } else {
+          isImageReady = true;
+          saveBtn.style.display = "block";
+          subEl.textContent = "기억 저장하기 버튼을 눌러 이미지를 저장할 수 있습니다.";
         }
       }
 
@@ -140,14 +173,29 @@
 
     target.addEventListener("targetFound", () => {
       statusEl.textContent = "사진이 인식되었습니다.";
-      subEl.textContent = "AI 이미지가 서서히 나타납니다.";
+      subEl.textContent = "이미지가 서서히 나타납니다.";
       startFade();
     });
 
     target.addEventListener("targetLost", () => {
-      statusEl.textContent = "사진을 다시 비춰주세요.";
+      statusEl.textContent = "전시 사진을 다시 비춰주세요.";
       subEl.textContent = "인식이 끊어졌습니다.";
+      isImageReady = false;
+      saveBtn.style.display = "none";
       stopFade();
+    });
+
+    saveBtn.addEventListener("click", () => {
+      if (!isImageReady) return;
+
+      const link = document.createElement("a");
+      link.href = "./assets/ai.jpg";
+      link.download = "memory-reconstruction.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      subEl.textContent = "이미지를 저장했습니다. iPhone에서는 다운로드 항목을 확인해주세요.";
     });
   </script>
 </body>
